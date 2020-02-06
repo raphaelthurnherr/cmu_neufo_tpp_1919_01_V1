@@ -1,5 +1,5 @@
-#include <Arduino.h>
-#include <U8x8lib.h>
+#include <Arduino.h>                    // Not necessary with Arduino IDE
+#include <U8x8lib.h>                    // U8x8 library for OLED display
 #include "tpp_neufo_1919_01_V1_board.h"
 #include "math.h"
 
@@ -12,13 +12,15 @@
 #define TXT_TEST_LED_BLUE "PWM LED BLUE "
 #define TXT_TEST_PWM_SERVO "PWM SERVO CN9"
 
+
+#define ARDUINO_ADC_RESOLUTION 4.8828  // => 5000mV / 1024
+//#define ARDUINO_ADC_RESOLUTION 3.2226  // => 3300mV / 1024
+
 // THE DEFINITION OF THE OUTPUTS NAME CORRESPONDING TO THE ARDUINO
 // PIN CAN BE FOUND IN THE "tpp_neufo_1919_01_V1_board.h" HEADER FILE.
 
 U8X8_SSD1306_128X32_UNIVISION_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);   // Adafruit ESP8266/32u4/ARM Boards + FeatherWing OLED
-//U8X8_SH1106_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);   // Adafruit ESP8266/32u4/ARM Boards + FeatherWing OLED
 board_1919_01_V01 tpp_1912_board;
-//Servo CN9_servomotor;
 
 char get_actual_menu_on_display_from_pot_RV1(int pot_RV1_value);
 void gfx_display_selected_menu(char menu);
@@ -26,18 +28,18 @@ void gfx_display_menu0_status_data(void);
 float convert_Deg_To_Rad(float x);
 
 int DAC_value_for_sinus = 0;
-int ADCinputVoltage_mV = 0;
+float ADCinputVoltage_mV = 0;
 float I_R13_R14_mA ;
 int sin_wave_counter, triangle_wave_counter, pwm_led_counter=255;
 char menu_selected_by_pot_RV1 = 0;
-int battery_BT1_voltage_mV = 0;
+float battery_BT1_voltage_mV = 0;
 int potentiometer_RV1_ADC_value = 0;
 int potentiometer_RV1_level = 0;
 int lickport_CN2_state = 0;
 int trigger_CN3_State = 0;
 int button_SW1_State = 0;
 char actual_menu_on_display=0;
-
+int displayRefreshTime=0;
 
 /**
  * @brief Initial setup function for Arduino
@@ -49,9 +51,6 @@ char actual_menu_on_display=0;
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
-  
-  // Servo on CN9 initialisation
-  //CN9_servomotor.attach(8);      // Attach left signal to pin 8
 
   // TPP board initialization
   tpp_1912_board.begin();
@@ -63,9 +62,12 @@ void setup() {
   u8x8.drawString(0, 2, "RTH 27.01.2020");
 
   delay(3000);
+  u8x8.setFont(u8x8_font_7x14B_1x2_f);
   u8x8.clearDisplay();
   u8x8.drawString(0, 0, "LCK:   TRG:  ");
   u8x8.drawString(0, 2, "BTN:   BAT:  ");
+
+  analogReference(DEFAULT);             // default voltage reference for ADC = 5V
 
   analogWrite(RGB_LED_RED, 255);
   analogWrite(RGB_LED_GREEN, 255);
@@ -102,9 +104,9 @@ void loop() {
   potentiometer_RV1_level = map(potentiometer_RV1_ADC_value, 0, 750, 100, 0);
 
   // Convert th ADC input register to voltage (5V/1024 = 4.8828 mV of resolution)
-  ADCinputVoltage_mV = analogRead(BT1_BATTERY_PIN) * 4.8828;
+  ADCinputVoltage_mV = analogRead(BT1_BATTERY_PIN) * ARDUINO_ADC_RESOLUTION;
   // Divider bridge current calculation (I=U_R14/R14)
-  I_R13_R14_mA = (float)ADCinputVoltage_mV / (float)56000;
+  I_R13_R14_mA = ADCinputVoltage_mV / (float)56000;
   // Make the sum of the voltage for U_R14 and U_R13(=R13 * IR13) to know the battery voltage;
   battery_BT1_voltage_mV = ADCinputVoltage_mV + ((float)43000 * I_R13_R14_mA);
 
@@ -135,21 +137,25 @@ void loop() {
   // ------ MAKE THE TEST OF ALL THE OUTPUT WHEN THE BUTTON IS PRESSED-------
   // ------ IF NOT, ONLY THE SELECTED OUTPUT BY THE MENU IS MADE ------------
   if(button_SW1_State){
-    DAC_value_for_sinus = round(((sin(convert_Deg_To_Rad((float)sin_wave_counter))+1)*2000));
+    /*
+    DAC_value_for_sinus = round(((sin(convert_Deg_To_Rad((float)sin_wave_counter))+1)*2300));
     tpp_1912_board.setAnalogOutput_mV(CHANNEL_1, DAC_value_for_sinus);
+    */
     tpp_1912_board.setAnalogOutput_value(CHANNEL_2,triangle_wave_counter );
     
+
     analogWrite(RGB_LED_RED, pwm_led_counter);
     analogWrite(RGB_LED_GREEN, pwm_led_counter);
     analogWrite(RGB_LED_BLUE, pwm_led_counter);
   }else
   {
-    Serial.write("Menu selected on display: ");
-    Serial.println(actual_menu_on_display, DEC);
-
     switch(actual_menu_on_display){
-      case 0 : gfx_display_menu0_status_data(); break;
-      case 1 : DAC_value_for_sinus = round(((sin(convert_Deg_To_Rad((float)sin_wave_counter))+1)*2000));
+      case 0 : if(displayRefreshTime>=100){
+                  gfx_display_menu0_status_data();
+                  displayRefreshTime=0;
+                }
+                  break;
+      case 1 : DAC_value_for_sinus = round(((sin(convert_Deg_To_Rad((float)sin_wave_counter))+1)*2300));
                tpp_1912_board.setAnalogOutput_mV(CHANNEL_1, DAC_value_for_sinus); break;
       case 2 : tpp_1912_board.setAnalogOutput_value(CHANNEL_2, triangle_wave_counter); break;
       case 3 : analogWrite(RGB_LED_RED, pwm_led_counter); break;
@@ -183,6 +189,8 @@ void loop() {
     pwm_led_counter=255;
   }
 
+  // COUNTER USED FOR DISPLAY REFRESH (CLEAR TO 0 BY TEST)
+  displayRefreshTime++;
 
   // LOOP DELAY IN [mS] FOR THE MAIN PROGRAM
   // ALSO DEFINE THE FREQUENCY FOR THE WAVEFORM ON THE OUTPUT
@@ -228,7 +236,7 @@ void gfx_display_selected_menu(char menu){
   switch(menu){
     case 0:    u8x8.drawString(0, 0, "LCK:   TRG:  ");
                u8x8.drawString(0, 2, "BTN:   BAT:  ");break;
-    case 7 : u8x8.drawString(0, 2, TXT_TEST_AOUT_1); break;
+    case 1 : u8x8.drawString(0, 2, TXT_TEST_AOUT_1); break;
     case 2 : u8x8.drawString(0, 2, TXT_TEST_AOUT_2); break;;
     case 3 : u8x8.drawString(0, 2, TXT_TEST_LED_RED); break;
     case 4 : u8x8.drawString(0, 2, TXT_TEST_LED_GREEN); break;
