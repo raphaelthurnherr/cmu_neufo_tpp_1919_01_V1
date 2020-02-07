@@ -1,0 +1,34 @@
+#######################################
+# Syntax Coloring Map Servo
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+TPP_neufo_board	KEYWORD1	TPP_neufo_board	
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin				KEYWORD2
+setAnalogOutput_mV		KEYWORD2
+setAnalogOutput_value		KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+device_mcp4726			LITERAL1
+CN3_TRIG_PIN 			LITERAL1
+SW1_BUTTTON_PIN			LITERAL1
+CN2_LICKPORT_PIN 		LITERAL1
+RGB_LED_RED 			LITERAL1
+RGB_LED_GREEN			LITERAL1
+RGB_LED_BLUE 			LITERAL1
+CHANNEL_1			LITERAL1
+CHANNEL_2			LITERAL1
+CN7				LITERAL1
+CN8				LITERAL1
+RV1_POT_PIN			LITERAL1
+BT1_BATTERY_PIN			LITERAL1
